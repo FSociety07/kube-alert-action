@@ -1,0 +1,26 @@
+# Compiled binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries and coverage
+*.test
+*.out
+coverage.*
+
+# Go workspace files (only relevant if you use `go work`)
+go.work
+go.work.sum
+
+# Environment / secrets — you'll likely have one of these later
+.env
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# OS-specific junk
+.DS_Store
+Thumbs.db
