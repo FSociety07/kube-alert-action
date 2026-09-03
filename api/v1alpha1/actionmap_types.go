@@ -27,3 +27,11 @@ type ActionRule struct {
 // TODO
 type ActionMapStatus struct {
 }
+
+// +kubebuilder:object:root=true
+type ActionMapList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []ActionMap `json:"items"`
+}
