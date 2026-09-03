@@ -13,10 +13,10 @@ import (
 
 // AlertPayload is the expected shape of an incoming alert.
 type AlertPayload struct {
-	Namespace string `json:"namespace"`
-	Container string `json:"container"`
-	Pod       string `json:"pod"`
-	Metric    string `json:"metric"`
+	TargetNamespace string `json:"targetNamespace"`
+	Container       string `json:"container"`
+	Pod             string `json:"pod"`
+	Metric          string `json:"metric"`
 }
 
 // Server implements manager.Runnable so it can be registered with mgr.Add().
@@ -55,7 +55,7 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 
 	// TODO 1: reject anything that isn't POST (http.MethodPost)
 	if r.Method != http.MethodPost {
-		log.Info("Invalid method: ", r.Method)
+		log.Info("Invalid method:", "method", r.Method)
 		http.Error(w, "Invalid method", 405)
 		return
 	}
@@ -69,10 +69,10 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO 3: validate — what counts as "invalid"? empty namespace/pod/metric?
+	// TODO 3: validate — what counts as "invalid"? empty TargetNamespace/pod/metric?
 	//         decide what status code to return for bad payloads (400?)
-	if alertpayLoad.Container == "" || alertpayLoad.Namespace == "" || alertpayLoad.Pod == "" || alertpayLoad.Metric == "" {
-		log.Info("Alert Payload is incomplete", "namespace", alertpayLoad.Namespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
+	if alertpayLoad.Container == "" || alertpayLoad.TargetNamespace == "" || alertpayLoad.Pod == "" || alertpayLoad.Metric == "" {
+		log.Info("Alert Payload is incomplete", "targetNamespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
 		http.Error(w, "Alert Payload is incomplete: "+fmt.Sprintf("%+v\n", alertpayLoad), 400)
 		return
 	}
@@ -81,5 +81,5 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 	//         don't wire that in yet)
 
 	w.WriteHeader(202)
-	log.Info("received alert", "namespace", alertpayLoad.Namespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
+	log.Info("received alert", "targetNamespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
 }
