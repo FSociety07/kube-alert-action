@@ -24,7 +24,7 @@ func main() {
 		log.Fatalf("Unable to start manager: %v", err)
 	}
 
-	if err := mgr.Add(&webhook.Server{Client: mgr.GetClient(), Addr: ":8080"}); err != nil {
+	if err := mgr.Add(&webhook.Server{Client: mgr.GetClient(), Addr: ":8000"}); err != nil {
 		log.Fatalf("Unable to add webhook server to the manager: %v", err)
 	}
 
