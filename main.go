@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"go_heap/api/v1alpha1"
-	"go_heap/api/webhook"
+	"go_heap/webhook"
 	"log"
 	"os/signal"
 	"syscall"
