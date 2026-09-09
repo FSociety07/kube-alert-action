@@ -10,9 +10,11 @@ import (
 
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 func main() {
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	cfg := ctrl.GetConfigOrDie()
 
 	if err := v1alpha1.AddToScheme(scheme.Scheme); err != nil {
