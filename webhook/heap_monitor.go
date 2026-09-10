@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"go_heap/api/v1alpha1"
 	"net/http"
 	"time"
 
@@ -82,4 +83,27 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(202)
 	log.Info("received alert", "targetNamespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
+
+	var actionMapList v1alpha1.ActionMapList
+	if err := s.Client.List(r.Context(), &actionMapList); err != nil {
+		http.Error(w, "Unable to reach the cluster: "+err.Error(), 500)
+		return
+	}
+
+	var action string
+	var executeFrom string
+
+out:
+	for _, v := range actionMapList.Items {
+		for _, rule := range v.Spec.Rules {
+			if alertpayLoad.Metric == rule.Metric {
+				log.Info("alert metric matched", "metric ", alertpayLoad.Metric, "action: ", rule.Action)
+				action := rule.Action
+				executeFrom := rule.ExecuteFrom
+				break out
+			}
+		}
+		log.Info("No alert metric matched", "metric ", alertpayLoad.Metric)
+	}
+
 }
