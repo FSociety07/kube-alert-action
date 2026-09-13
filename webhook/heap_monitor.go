@@ -58,7 +58,7 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 
 	// TODO 1: reject anything that isn't POST (http.MethodPost)
 	if r.Method != http.MethodPost {
-		log.Info("Invalid method:", "method", r.Method)
+		log.Error(nil, "Invalid method:", "method", r.Method)
 		http.Error(w, "Invalid method", 405)
 		return
 	}
@@ -75,7 +75,7 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 	// TODO 3: validate — what counts as "invalid"? empty TargetNamespace/pod/metric?
 	//         decide what status code to return for bad payloads (400?)
 	if alertpayLoad.Container == "" || alertpayLoad.TargetNamespace == "" || alertpayLoad.Pod == "" || alertpayLoad.Metric == "" {
-		log.Info("Alert Payload is incomplete", "targetNamespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
+		log.Error(nil, "Alert Payload is incomplete", "targetNamespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
 		http.Error(w, "Alert Payload is incomplete: "+fmt.Sprintf("%+v\n", alertpayLoad), 400)
 		return
 	}
@@ -87,6 +87,7 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 
 	matchFound, action, executeFrom, err := s.matchRule(r.Context(), alertpayLoad.Metric)
 	if err != nil {
+		log.Error(err, "Unable to reach the cluster")
 		http.Error(w, "Unable to reach the cluster: "+err.Error(), 500)
 		return
 	}
@@ -116,11 +117,12 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 				},
 			}
 			if err := s.Client.Create(r.Context(), CreateAlertEvent); err != nil {
-				http.Error(w, "Unable to create AlertEvent: "+err.Error(), 500)
 				log.Error(err, "Unable to create AlertEvent")
+				http.Error(w, "Unable to create AlertEvent: "+err.Error(), 500)
 				return
 			}
 		} else {
+			log.Error(err, "Unable to query the cluster on listing AlertEvents")
 			http.Error(w, "Unable to query the cluster on listing AlertEvents: "+err.Error(), 500)
 			return
 		}
