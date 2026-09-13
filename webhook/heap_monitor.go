@@ -92,18 +92,23 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 
 	var action string
 	var executeFrom string
+	matchFound := false
 
 out:
 	for _, v := range actionMapList.Items {
 		for _, rule := range v.Spec.Rules {
 			if alertpayLoad.Metric == rule.Metric {
-				log.Info("alert metric matched", "metric ", alertpayLoad.Metric, "action: ", rule.Action)
-				action := rule.Action
-				executeFrom := rule.ExecuteFrom
+				log.Info("alert metric matched", "metric", alertpayLoad.Metric, "action", rule.Action)
+				action = rule.Action
+				executeFrom = rule.ExecuteFrom
+				matchFound = true
 				break out
 			}
 		}
-		log.Info("No alert metric matched", "metric ", alertpayLoad.Metric)
+	}
+
+	if !matchFound {
+		log.Info("no match found for metric", "metric", alertpayLoad.Metric)
 	}
 
 }
