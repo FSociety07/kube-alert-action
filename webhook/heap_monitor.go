@@ -81,13 +81,29 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 	//         (actual CRD matching + AlertEvent creation comes in the next step —
 	//         don't wire that in yet)
 
-	w.WriteHeader(202)
 	log.Info("received alert", "targetNamespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
 
-	var actionMapList v1alpha1.ActionMapList
-	if err := s.Client.List(r.Context(), &actionMapList); err != nil {
+	matchFound, action, executeFrom, err := s.matchRule(r.Context(), alertpayLoad.Metric)
+	if err != nil {
 		http.Error(w, "Unable to reach the cluster: "+err.Error(), 500)
 		return
+	}
+
+	if !matchFound {
+		log.Info("no match found for metric", "metric", alertpayLoad.Metric)
+
+	} else {
+		log.Info("AlertEvent CRD to be created", "action", action, "executeFrom", executeFrom)
+	}
+
+	w.WriteHeader(202)
+}
+
+func (s *Server) matchRule(ctx context.Context, payLoadMetric string) (bool, string, string, error) {
+	log := logf.FromContext(ctx)
+	var actionMapList v1alpha1.ActionMapList
+	if err := s.Client.List(ctx, &actionMapList); err != nil {
+		return false, "", "", err
 	}
 
 	var action string
@@ -97,8 +113,8 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 out:
 	for _, v := range actionMapList.Items {
 		for _, rule := range v.Spec.Rules {
-			if alertpayLoad.Metric == rule.Metric {
-				log.Info("alert metric matched", "metric", alertpayLoad.Metric, "action", rule.Action)
+			if payLoadMetric == rule.Metric {
+				log.Info("alert metric matched", "metric", payLoadMetric, "action", rule.Action)
 				action = rule.Action
 				executeFrom = rule.ExecuteFrom
 				matchFound = true
@@ -108,9 +124,11 @@ out:
 	}
 
 	if !matchFound {
-		log.Info("no match found for metric", "metric", alertpayLoad.Metric)
-	} else {
-		log.Info("AlertEvent CRD to be created", "action", action, "executeFrom", executeFrom)
+		//log.Info("no match found for metric", "metric", payLoadMetric)
+		return false, "", "", nil
 	}
+
+	//log.Info("AlertEvent CRD to be created", "action", action, "executeFrom", executeFrom)
+	return true, action, executeFrom, nil
 
 }
