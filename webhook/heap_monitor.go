@@ -117,6 +117,8 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 			}
 			if err := s.Client.Create(r.Context(), CreateAlertEvent); err != nil {
 				http.Error(w, "Unable to create AlertEvent: "+err.Error(), 500)
+				log.Error(err, "Unable to create AlertEvent")
+				return
 			}
 		} else {
 			http.Error(w, "Unable to query the cluster on listing AlertEvents: "+err.Error(), 500)
