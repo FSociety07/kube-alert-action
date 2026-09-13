@@ -109,6 +109,8 @@ out:
 
 	if !matchFound {
 		log.Info("no match found for metric", "metric", alertpayLoad.Metric)
+	} else {
+		log.Info("AlertEvent CRD to be created", "action", action, "executeFrom", executeFrom)
 	}
 
 }
