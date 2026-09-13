@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -94,6 +96,32 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 
 	} else {
 		log.Info("AlertEvent CRD to be created", "action", action, "executeFrom", executeFrom)
+		var alertEvent v1alpha1.AlertEvent
+		if err := s.Client.Get(r.Context(), client.ObjectKey{Namespace: alertpayLoad.TargetNamespace, Name: alertpayLoad.Container + "-" + alertpayLoad.Metric}, &alertEvent); err == nil {
+			log.Info("CRD already exists", "namespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "metric", alertpayLoad.Metric)
+		} else if apierrors.IsNotFound(err) {
+			log.Info("Creating CRD", "namespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "metric", alertpayLoad.Metric)
+			CreateAlertEvent := &v1alpha1.AlertEvent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      alertpayLoad.Container + "-" + alertpayLoad.Metric,
+					Namespace: alertpayLoad.TargetNamespace,
+				},
+				Spec: v1alpha1.AlertEventSpec{
+					TargetNamespace: alertpayLoad.TargetNamespace,
+					Container:       alertpayLoad.Container,
+					Pod:             alertpayLoad.Pod,
+					Metric:          alertpayLoad.Metric,
+					Action:          action,
+					ExecuteFrom:     executeFrom,
+				},
+			}
+			if err := s.Client.Create(r.Context(), CreateAlertEvent); err != nil {
+				http.Error(w, "Unable to create AlertEvent: "+err.Error(), 500)
+			}
+		} else {
+			http.Error(w, "Unable to query the cluster on listing AlertEvents: "+err.Error(), 500)
+			return
+		}
 	}
 
 	w.WriteHeader(202)
@@ -124,11 +152,9 @@ out:
 	}
 
 	if !matchFound {
-		//log.Info("no match found for metric", "metric", payLoadMetric)
 		return false, "", "", nil
 	}
 
-	//log.Info("AlertEvent CRD to be created", "action", action, "executeFrom", executeFrom)
 	return true, action, executeFrom, nil
 
 }
