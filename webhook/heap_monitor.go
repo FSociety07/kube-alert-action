@@ -96,12 +96,12 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 		log.Info("no match found for metric", "metric", alertpayLoad.Metric)
 
 	} else {
-		log.Info("AlertEvent CRD to be created", "action", action, "executeFrom", executeFrom)
+		log.Info("AlertEvent CR to be created", "action", action, "executeFrom", executeFrom)
 		var alertEvent v1alpha1.AlertEvent
 		if err := s.Client.Get(r.Context(), client.ObjectKey{Namespace: alertpayLoad.TargetNamespace, Name: alertpayLoad.Container + "-" + alertpayLoad.Metric}, &alertEvent); err == nil {
-			log.Info("CRD already exists", "namespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "metric", alertpayLoad.Metric)
+			log.Info("AlertEvent CR already exists", "namespace", alertpayLoad.TargetNamespace, "name", alertpayLoad.Container+"-"+alertpayLoad.Metric)
 		} else if apierrors.IsNotFound(err) {
-			log.Info("Creating CRD", "namespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "metric", alertpayLoad.Metric)
+			log.Info("Creating AlertEvent CR", "namespace", alertpayLoad.TargetNamespace, "name", alertpayLoad.Container+"-"+alertpayLoad.Metric)
 			CreateAlertEvent := &v1alpha1.AlertEvent{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      alertpayLoad.Container + "-" + alertpayLoad.Metric,
@@ -120,9 +120,11 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 				},
 			}
 			if err := s.Client.Create(r.Context(), CreateAlertEvent); err != nil {
-				log.Error(err, "Unable to create AlertEvent")
-				http.Error(w, "Unable to create AlertEvent: "+err.Error(), 500)
+				log.Error(err, "Unable to create AlertEvent CR")
+				http.Error(w, "Unable to create AlertEvent CR: "+err.Error(), 500)
 				return
+			} else {
+				log.Info("AlertEvent CR created", "namespace", alertpayLoad.TargetNamespace, "name", alertpayLoad.Container+"-"+alertpayLoad.Metric)
 			}
 		} else {
 			log.Error(err, "Unable to query the cluster on listing AlertEvents")
