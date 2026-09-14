@@ -115,6 +115,9 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 					Action:          action,
 					ExecuteFrom:     executeFrom,
 				},
+				Status: v1alpha1.AlertEventStatus{
+					Phase: v1alpha1.PhasePending,
+				},
 			}
 			if err := s.Client.Create(r.Context(), CreateAlertEvent); err != nil {
 				log.Error(err, "Unable to create AlertEvent")

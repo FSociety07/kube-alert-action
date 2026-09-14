@@ -22,9 +22,18 @@ type AlertEventSpec struct {
 	ExecuteFrom     string `json:"executeFrom"`
 }
 
-// TODO
 type AlertEventStatus struct {
+	Phase      string       `json:"phase,omitempty"`
+	ExecutedAt *metav1.Time `json:"executedAt,omitempty"`
+	Message    string       `json:"message,omitempty"`
 }
+
+const (
+	PhasePending    = "Pending"
+	PhaseInProgress = "InProgress"
+	PhaseCompleted  = "Completed"
+	PhaseFailed     = "Failed"
+)
 
 // +kubebuilder:object:root=true
 type AlertEventList struct {
