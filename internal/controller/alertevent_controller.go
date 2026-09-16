@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"go_heap/api/v1alpha1"
+	"os/exec"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +33,49 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 	} else if alertEvent.Status.Phase == v1alpha1.PhaseInProgress {
 		log.Info("Action already in progress", "name", req.NamespacedName)
 		return reconcile.Result{}, nil
+	}
+
+	if alertEvent.Status.Phase != v1alpha1.PhasePending {
+		if alertEvent.Status.Phase == v1alpha1.PhaseInProgress {
+			log.Info("Action already in progress", "name", req.NamespacedName)
+			return reconcile.Result{}, nil
+		}
+		log.Info("Action already executed", "name", req.NamespacedName)
+		return reconcile.Result{}, nil
+	}
+
+	alertEvent.Status.Phase = v1alpha1.PhaseInProgress
+	if err := r.Client.Status().Update(ctx, &alertEvent); err != nil {
+		log.Error(err, "Error updating status to InProgress for AlertEvent CR", "name", req.NamespacedName)
+		return reconcile.Result{}, err
+	}
+
+	//TODO write a checkpoint to ensure that the script alertEvent.Spec.Action exists. error and return if not
+
+	switch alertEvent.Spec.ExecuteFrom {
+	case "self":
+		cmd := exec.CommandContext(ctx, alertEvent.Spec.Action, alertEvent.Spec.TargetNamespace, alertEvent.Spec.Pod)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Error(err, "Error executing action for AlertEvent", "name", req.NamespacedName, "error", err)
+			alertEvent.Status.Phase = v1alpha1.PhaseFailed
+			alertEvent.Status.Message = err.Error() + ": " + string(output)
+			if err1 := r.Client.Status().Update(ctx, &alertEvent); err1 != nil {
+				log.Error(err1, "Error updating status message for AlertEvent", "name", req.NamespacedName)
+				return reconcile.Result{}, err1
+			}
+			return reconcile.Result{}, err
+		}
+		log.Info("Action successfully executed for AlertEvent", "name", req.NamespacedName, "output", string(output))
+		alertEvent.Status.Phase = v1alpha1.PhaseCompleted
+		alertEvent.Status.Message = string(output)
+		if err := r.Client.Status().Update(ctx, &alertEvent); err != nil {
+			log.Error(err, "Error updating status to Completed for AlertEvent", "name", req.NamespacedName, "error", err)
+			return reconcile.Result{}, err
+		}
+
+	case "targetPod":
+		//TODO
 	}
 
 	return reconcile.Result{}, nil
