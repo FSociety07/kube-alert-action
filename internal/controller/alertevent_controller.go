@@ -3,16 +3,24 @@ package controller
 import (
 	"context"
 	"go_heap/api/v1alpha1"
+	"os"
 	"os/exec"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 type AlertEventReconciler struct {
-	Client client.Client
+	Client     client.Client
+	RestConfig *rest.Config
 }
 
 func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
@@ -75,7 +83,39 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 		}
 
 	case "targetPod":
-		//TODO
+		clientset, err := kubernetes.NewForConfig(r.RestConfig)
+		if err != nil {
+			log.Error(err, "failed to create clientset", "name", req.NamespacedName)
+			return reconcile.Result{}, err
+		}
+		execReq := clientset.CoreV1().RESTClient().Post().
+			Resource("pods").
+			Name(alertEvent.Spec.Pod).
+			Namespace(alertEvent.Spec.TargetNamespace).
+			SubResource("exec")
+
+		cmd := []string{alertEvent.Spec.Action, alertEvent.Spec.TargetNamespace, alertEvent.Spec.Pod}
+
+		// Container field is omitted.
+		option := corev1.PodExecOptions{
+			Command: cmd,
+			Stdout:  true,
+			Stderr:  true,
+		}
+
+		execReq = execReq.VersionedParams(&option, scheme.ParameterCodec)
+
+		exec, err := remotecommand.NewWebSocketExecutor(r.RestConfig, "POST", execReq.URL().String())
+		if err != nil {
+			log.Error(err, "failed to create executor", "name", req.NamespacedName)
+			return reconcile.Result{}, err
+		}
+
+		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{Stdout: os.Stdout, Stderr: os.Stderr})
+		if err != nil {
+			log.Error(err, "failed to stream exec", "name", req.NamespacedName)
+			return reconcile.Result{}, err
+		}
 	}
 
 	return reconcile.Result{}, nil
