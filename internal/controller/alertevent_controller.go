@@ -41,7 +41,7 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 			log.Info("Action already in progress", "name", req.NamespacedName)
 			return reconcile.Result{}, nil
 		}
-		log.Info("Action already executed", "name", req.NamespacedName)
+		log.Info("Action already executed", "name", req.NamespacedName) //Status update triggers reconcile too
 		return reconcile.Result{}, nil
 	}
 
