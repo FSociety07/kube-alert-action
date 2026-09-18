@@ -41,6 +41,7 @@ spec:
                 items:
                   properties:
                     action:
+                      minLength: 1
                       type: string
                     executeFrom:
                       enum:
@@ -48,6 +49,7 @@ spec:
                       - targetPod
                       type: string
                     metric:
+                      minLength: 1
                       type: string
                   required:
                   - action
