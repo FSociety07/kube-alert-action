@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"go_heap/api/v1alpha1"
+	"go_heap/internal/controller"
 	"go_heap/webhook"
 	"log"
 	"os/signal"
@@ -28,6 +29,16 @@ func main() {
 
 	if err := mgr.Add(&webhook.Server{Client: mgr.GetClient(), Addr: ":8000"}); err != nil {
 		log.Fatalf("Unable to add webhook server to the manager: %v", err)
+	}
+
+	err = ctrl.NewControllerManagedBy(mgr).
+		For(&v1alpha1.AlertEvent{}).
+		Complete(&controller.AlertEventReconciler{
+			Client: mgr.GetClient(), RestConfig: cfg,
+		})
+
+	if err != nil {
+		log.Fatalf("unable to create controller: %v", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
