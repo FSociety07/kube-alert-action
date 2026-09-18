@@ -18,7 +18,9 @@ type ActionMapSpec struct {
 }
 
 type ActionRule struct {
+	// +kubebuilder:validation:MinLength=1
 	Metric string `json:"metric"`
+	// +kubebuilder:validation:MinLength=1
 	Action string `json:"action"`
 	// +kubebuilder:validation:Enum=self;targetPod
 	ExecuteFrom string `json:"executeFrom"`

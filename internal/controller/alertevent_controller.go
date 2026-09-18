@@ -1,9 +1,9 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"go_heap/api/v1alpha1"
-	"os"
 	"os/exec"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,13 +34,6 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 		}
 		log.Error(err, "Error while retrieving AlertEvent CR", "name", req.NamespacedName)
 		return reconcile.Result{}, err
-	}
-
-	if alertEvent.Status.Phase == v1alpha1.PhasePending {
-		//TODO: execute script
-	} else if alertEvent.Status.Phase == v1alpha1.PhaseInProgress {
-		log.Info("Action already in progress", "name", req.NamespacedName)
-		return reconcile.Result{}, nil
 	}
 
 	if alertEvent.Status.Phase != v1alpha1.PhasePending {
@@ -81,6 +74,7 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 			log.Error(err, "Error updating status to Completed for AlertEvent", "name", req.NamespacedName, "error", err)
 			return reconcile.Result{}, err
 		}
+		return reconcile.Result{}, nil
 
 	case "targetPod":
 		clientset, err := kubernetes.NewForConfig(r.RestConfig)
@@ -105,18 +99,36 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 
 		execReq = execReq.VersionedParams(&option, scheme.ParameterCodec)
 
-		exec, err := remotecommand.NewWebSocketExecutor(r.RestConfig, "POST", execReq.URL().String())
+		executor, err := remotecommand.NewWebSocketExecutor(r.RestConfig, "POST", execReq.URL().String())
 		if err != nil {
 			log.Error(err, "failed to create executor", "name", req.NamespacedName)
 			return reconcile.Result{}, err
 		}
-
-		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{Stdout: os.Stdout, Stderr: os.Stderr})
+		var stdout, stderr bytes.Buffer
+		err = executor.StreamWithContext(ctx, remotecommand.StreamOptions{Stdout: &stdout, Stderr: &stderr})
 		if err != nil {
-			log.Error(err, "failed to stream exec", "name", req.NamespacedName)
+			log.Error(err, "Error executing action for AlertEvent", "name", req.NamespacedName)
+			alertEvent.Status.Phase = v1alpha1.PhaseFailed
+			alertEvent.Status.Message = err.Error() + ": " + stderr.String()
+			if err1 := r.Client.Status().Update(ctx, &alertEvent); err1 != nil {
+				log.Error(err1, "Error updating status message for AlertEvent", "name", req.NamespacedName)
+				return reconcile.Result{}, err1
+			}
 			return reconcile.Result{}, err
 		}
+
+		log.Info("Action successfully executed for AlertEvent", "name", req.NamespacedName, "output", stdout.String())
+		alertEvent.Status.Phase = v1alpha1.PhaseCompleted
+		alertEvent.Status.Message = stdout.String()
+		if err := r.Client.Status().Update(ctx, &alertEvent); err != nil {
+			log.Error(err, "Error updating status to Completed for AlertEvent", "name", req.NamespacedName, "error", err)
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
+
+	default:
+		log.Error(nil, "Only 'self' and 'targetPod' are allowed for ExecuteFrom field")
+		return reconcile.Result{}, nil
 	}
 
-	return reconcile.Result{}, nil
 }
