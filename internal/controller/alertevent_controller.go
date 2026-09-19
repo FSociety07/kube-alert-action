@@ -65,7 +65,7 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 				log.Error(err1, "Error updating status message for AlertEvent", "name", req.NamespacedName)
 				return reconcile.Result{}, err1
 			}
-			return reconcile.Result{}, err
+			return reconcile.Result{}, nil
 		}
 		log.Info("Action successfully executed for AlertEvent", "name", req.NamespacedName, "output", string(output))
 		alertEvent.Status.Phase = v1alpha1.PhaseCompleted
@@ -114,7 +114,7 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 				log.Error(err1, "Error updating status message for AlertEvent", "name", req.NamespacedName)
 				return reconcile.Result{}, err1
 			}
-			return reconcile.Result{}, err
+			return reconcile.Result{}, nil
 		}
 
 		log.Info("Action successfully executed for AlertEvent", "name", req.NamespacedName, "output", stdout.String())
