@@ -38,6 +38,8 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 		return reconcile.Result{}, err
 	}
 
+	GChatThreadKey := notify.ThreadKey(alertEvent.Spec.Container, alertEvent.Spec.Metric)
+
 	if alertEvent.Status.Phase != v1alpha1.PhasePending {
 		if alertEvent.Status.Phase == v1alpha1.PhaseInProgress {
 			log.Info("Action already in progress", "name", req.NamespacedName)

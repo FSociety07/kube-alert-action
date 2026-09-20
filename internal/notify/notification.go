@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -18,6 +19,10 @@ type ChatMessage struct {
 
 type Notifier struct {
 	WebhookURL string
+}
+
+func ThreadKey(container, metric string) string {
+	return container + "-" + metric + "-" + time.Now().Format("2006-01-02")
 }
 
 func (n *Notifier) SendMessage(ctx context.Context, msg string, threadKey string) error {
