@@ -3,6 +3,7 @@ package controller
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"go_heap/api/v1alpha1"
 	"go_heap/internal/notify"
 	"os/exec"
@@ -50,6 +51,10 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 	}
 
 	alertEvent.Status.Phase = v1alpha1.PhaseInProgress
+	msg := "*Action inprogress*"
+	if err := r.Notifier.SendMessage(ctx, msg, GChatThreadKey); err != nil {
+		log.Error(err, "Failed to send Chat notification")
+	}
 	if err := r.Client.Status().Update(ctx, &alertEvent); err != nil {
 		log.Error(err, "Error updating status to InProgress for AlertEvent CR", "name", req.NamespacedName)
 		return reconcile.Result{}, err
@@ -63,6 +68,10 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			log.Error(err, "Error executing action for AlertEvent", "name", req.NamespacedName, "error", err)
+			msg := fmt.Sprintf("*Error executing action for AlertEvent name:%s error:%s*", req.NamespacedName, err)
+			if err := r.Notifier.SendMessage(ctx, msg, GChatThreadKey); err != nil {
+				log.Error(err, "Failed to send Chat notification")
+			}
 			alertEvent.Status.Phase = v1alpha1.PhaseFailed
 			alertEvent.Status.Message = err.Error() + ": " + string(output)
 			if err1 := r.Client.Status().Update(ctx, &alertEvent); err1 != nil {
@@ -72,6 +81,10 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 			return reconcile.Result{}, nil
 		}
 		log.Info("Action successfully executed for AlertEvent", "name", req.NamespacedName, "output", string(output))
+		msg := fmt.Sprintf("*Action successfully executed for AlertEvent name:%s output:%s*", req.NamespacedName, string(output))
+		if err := r.Notifier.SendMessage(ctx, msg, GChatThreadKey); err != nil {
+			log.Error(err, "Failed to send Chat notification")
+		}
 		alertEvent.Status.Phase = v1alpha1.PhaseCompleted
 		alertEvent.Status.Message = string(output)
 		if err := r.Client.Status().Update(ctx, &alertEvent); err != nil {
@@ -112,6 +125,10 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 		err = executor.StreamWithContext(ctx, remotecommand.StreamOptions{Stdout: &stdout, Stderr: &stderr})
 		if err != nil {
 			log.Error(err, "Error executing action for AlertEvent", "name", req.NamespacedName)
+			msg := fmt.Sprintf("*Error executing action for AlertEvent name:%s error:%s", req.NamespacedName, err)
+			if err := r.Notifier.SendMessage(ctx, msg, GChatThreadKey); err != nil {
+				log.Error(err, "Failed to send Chat notification")
+			}
 			alertEvent.Status.Phase = v1alpha1.PhaseFailed
 			alertEvent.Status.Message = err.Error() + ": " + stderr.String()
 			if err1 := r.Client.Status().Update(ctx, &alertEvent); err1 != nil {
@@ -122,6 +139,10 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 		}
 
 		log.Info("Action successfully executed for AlertEvent", "name", req.NamespacedName, "output", stdout.String())
+		msg := fmt.Sprintf("*Action successfully executed for AlertEvent name:%s output:%s", req.NamespacedName, stdout.String())
+		if err := r.Notifier.SendMessage(ctx, msg, GChatThreadKey); err != nil {
+			log.Error(err, "Failed to send Chat notification")
+		}
 		alertEvent.Status.Phase = v1alpha1.PhaseCompleted
 		alertEvent.Status.Message = stdout.String()
 		if err := r.Client.Status().Update(ctx, &alertEvent); err != nil {
