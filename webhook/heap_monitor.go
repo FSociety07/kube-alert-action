@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go_heap/api/v1alpha1"
+	"go_heap/internal/notify"
 	"net/http"
 	"time"
 
@@ -24,8 +25,9 @@ type AlertPayload struct {
 
 // Server implements manager.Runnable so it can be registered with mgr.Add().
 type Server struct {
-	Client client.Client
-	Addr   string
+	Client   client.Client
+	Addr     string
+	Notifier *notify.Notifier
 }
 
 func (s *Server) Start(ctx context.Context) error {

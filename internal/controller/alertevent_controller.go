@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"go_heap/api/v1alpha1"
+	"go_heap/internal/notify"
 	"os/exec"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,6 +22,7 @@ import (
 type AlertEventReconciler struct {
 	Client     client.Client
 	RestConfig *rest.Config
+	Notifier   *notify.Notifier
 }
 
 func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {

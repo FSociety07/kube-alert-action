@@ -4,8 +4,10 @@ import (
 	"context"
 	"go_heap/api/v1alpha1"
 	"go_heap/internal/controller"
+	"go_heap/internal/notify"
 	"go_heap/webhook"
 	"log"
+	"os"
 	"os/signal"
 	"syscall"
 
@@ -27,14 +29,21 @@ func main() {
 		log.Fatalf("Unable to start manager: %v", err)
 	}
 
-	if err := mgr.Add(&webhook.Server{Client: mgr.GetClient(), Addr: ":8000"}); err != nil {
+	notifier := &notify.Notifier{WebhookURL: os.Getenv("GOOGLE_CHAT_WEBHOOK_URL")}
+
+	if err := mgr.Add(&webhook.Server{
+		Client:   mgr.GetClient(),
+		Addr:     ":8000",
+		Notifier: notifier}); err != nil {
 		log.Fatalf("Unable to add webhook server to the manager: %v", err)
 	}
 
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.AlertEvent{}).
 		Complete(&controller.AlertEventReconciler{
-			Client: mgr.GetClient(), RestConfig: cfg,
+			Client:     mgr.GetClient(),
+			RestConfig: cfg,
+			Notifier:   notifier,
 		})
 
 	if err != nil {
