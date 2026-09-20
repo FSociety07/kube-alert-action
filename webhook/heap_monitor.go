@@ -27,7 +27,7 @@ type AlertPayload struct {
 type Server struct {
 	Client   client.Client
 	Addr     string
-	Notifier *notify.Notifier
+	Notifier notify.Notifier
 }
 
 func (s *Server) Start(ctx context.Context) error {

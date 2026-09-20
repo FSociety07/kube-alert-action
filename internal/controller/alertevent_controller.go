@@ -22,7 +22,7 @@ import (
 type AlertEventReconciler struct {
 	Client     client.Client
 	RestConfig *rest.Config
-	Notifier   *notify.Notifier
+	Notifier   notify.Notifier
 }
 
 func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
