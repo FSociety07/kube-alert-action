@@ -133,6 +133,12 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Unable to create AlertEvent CR: "+err.Error(), 500)
 				return
 			} else {
+				CreateAlertEvent.Status.Phase = v1alpha1.PhasePending
+				if err := s.Client.Status().Update(r.Context(), CreateAlertEvent); err != nil {
+					log.Error(err, "Unable to set initial status for AlertEvent CR")
+					http.Error(w, "Unable to set initial status: "+err.Error(), 500)
+					return
+				}
 				log.Info("AlertEvent CR created", "namespace", alertpayLoad.TargetNamespace, "name", alertpayLoad.Container+"-"+alertpayLoad.Metric)
 				msg := fmt.Sprintf("*AlertEvent CR created* namespace:%s name:%s", alertpayLoad.TargetNamespace, alertpayLoad.Container+"-"+alertpayLoad.Metric)
 				if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
