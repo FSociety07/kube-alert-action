@@ -124,7 +124,7 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 					Action:          action,
 					ExecuteFrom:     executeFrom,
 				},
-				Status: v1alpha1.AlertEventStatus{
+				Status: v1alpha1.AlertEventStatus{ //does not work consistently. status is set below after CR creation
 					Phase: v1alpha1.PhasePending,
 				},
 			}
