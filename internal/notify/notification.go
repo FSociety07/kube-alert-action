@@ -46,6 +46,7 @@ func (n *Notifier) SendMessage(ctx context.Context, msg string, threadKey string
 	q := u.Query()
 
 	q.Set("threadKey", threadKey)
+	q.Set("messageReplyOption", "REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD")
 	u.RawQuery = q.Encode()
 	finalURL := u.String()
 
