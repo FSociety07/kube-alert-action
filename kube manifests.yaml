@@ -101,6 +101,9 @@ spec:
           ports:
             - name: webhook
               containerPort: 8000
+          env:
+          - name: GOOGLE_CHAT_WEBHOOK_URL
+            value: ""
 
 ---
 
