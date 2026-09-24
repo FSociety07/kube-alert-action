@@ -86,7 +86,7 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	matchFound, action, executeFrom, err := s.matchRule(r.Context(), alertpayLoad.Metric)
+	matchFound, action, executeFrom, err := s.matchRule(r.Context(), alertpayLoad.Metric, alertpayLoad.TargetNamespace)
 	if err != nil {
 		log.Error(err, "Unable to reach the cluster")
 		http.Error(w, "Unable to reach the cluster: "+err.Error(), 500)
@@ -155,10 +155,10 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(202)
 }
 
-func (s *Server) matchRule(ctx context.Context, payLoadMetric string) (bool, string, string, error) {
+func (s *Server) matchRule(ctx context.Context, payLoadMetric string, payLoadtargetNamespace string) (bool, string, string, error) {
 	log := logf.FromContext(ctx)
 	var actionMapList v1alpha1.ActionMapList
-	if err := s.Client.List(ctx, &actionMapList); err != nil {
+	if err := s.Client.List(ctx, &actionMapList, client.InNamespace(payLoadtargetNamespace)); err != nil {
 		return false, "", "", err
 	}
 
