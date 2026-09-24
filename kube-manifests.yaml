@@ -94,6 +94,8 @@ spec:
       labels:
         app: kube-alert-action
     spec:
+      securityContext:
+        runAsNonRoot: true
       serviceAccountName: kube-alert-action
       containers:
         - name: kube-alert-action
