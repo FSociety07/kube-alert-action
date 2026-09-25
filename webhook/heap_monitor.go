@@ -71,6 +71,8 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Malformed alert: "+err.Error(), 400)
 		return
 	}
+	log.Info("Alert body received", "body", r.Body)
+	log.Info("Alert payload received", "payload", alertpayLoad)
 
 	GChatThreadKey := notify.ThreadKey(alertpayLoad.Container, alertpayLoad.Metric)
 
