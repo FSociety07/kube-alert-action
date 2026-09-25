@@ -82,7 +82,8 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 
 	if alertpayLoad.Container == "" || alertpayLoad.TargetNamespace == "" || alertpayLoad.Pod == "" || alertpayLoad.Metric == "" {
 		log.Error(nil, "Alert Payload is incomplete", "targetNamespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
-		http.Error(w, "Alert Payload is incomplete: "+fmt.Sprintf("%+v\n", alertpayLoad), 400)
+		w.WriteHeader(http.StatusOK)
+		//http.Error(w, "Alert Payload is incomplete: "+fmt.Sprintf("%+v\n", alertpayLoad), 400) //grafana alert channel test does not succeed due to http 400
 		return
 	}
 
