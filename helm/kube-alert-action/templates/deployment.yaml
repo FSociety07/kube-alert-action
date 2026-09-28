@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-alert-action
+  namespace: kube-alert-action
+  labels:
+    app: kube-alert-action
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kube-alert-action
+  template:
+    metadata:
+      labels:
+        app: kube-alert-action
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: kube-alert-action
+      containers:
+        - name: kube-alert-action
+          image: sawn37/kube-alert-action:beta
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: webhook
+              containerPort: 8000
+          env:
+          - name: GOOGLE_CHAT_WEBHOOK_URL
+            value: ""
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu : "1"
+            limits:
+              memory: "128Mi"
+              cpu: "1"
