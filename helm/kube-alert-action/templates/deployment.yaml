@@ -1,37 +1,35 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kube-alert-action
-  namespace: kube-alert-action
+  name: {{ .Release.Name }}
   labels:
-    app: kube-alert-action
+    app: {{ .Release.Name }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: kube-alert-action
+      app: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: kube-alert-action
+        app: {{ .Release.Name }}
     spec:
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: kube-alert-action
+      serviceAccountName: {{ .Release.Name }}
       containers:
-        - name: kube-alert-action
-          image: sawn37/kube-alert-action:beta
+        - name: {{ .Release.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: IfNotPresent
           ports:
             - name: webhook
               containerPort: 8000
+          {{- if .Values.env.GOOGLE_CHAT_WEBHOOK_URL }}
           env:
           - name: GOOGLE_CHAT_WEBHOOK_URL
-            value: ""
+            value: {{ .Values.env.GOOGLE_CHAT_WEBHOOK_URL  | quote }}
+          {{- end}}
+          {{- if .Values.resources  }}
           resources:
-            requests:
-              memory: "128Mi"
-              cpu : "1"
-            limits:
-              memory: "128Mi"
-              cpu: "1"
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- end }}
