@@ -38,7 +38,8 @@ jobs:
       - name: Push chart
         run: |
           CHART_VERSION=$(grep '^version:' helm/kube-alert-action/Chart.yaml | awk '{print $2}')
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
 
           helm push \
             kube-alert-action-${CHART_VERSION}.tgz \
-            oci://ghcr.io/${{ github.repository_owner }}
+            oci://ghcr.io/${OWNER}
