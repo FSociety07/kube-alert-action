@@ -37,7 +37,7 @@ jobs:
 
       - name: Push chart
         run: |
-          CHART_VERSION=$(grep '^version:' charts/kube-alert-action/Chart.yaml | awk '{print $2}')
+          CHART_VERSION=$(grep '^version:' helm/kube-alert-action/Chart.yaml | awk '{print $2}')
 
           helm push \
             kube-alert-action-${CHART_VERSION}.tgz \
