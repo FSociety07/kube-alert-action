@@ -1,0 +1,44 @@
+name: Publish Helm Chart
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Login to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            helm registry login ghcr.io \
+            -u "${{ github.actor }}" \
+            --password-stdin
+
+      - name: Lint chart
+        run: |
+          helm lint ./charts/kube-alert-action
+
+      - name: Package chart
+        run: |
+          helm package ./charts/kube-alert-action
+
+      - name: Push chart
+        run: |
+          CHART_VERSION=$(grep '^version:' charts/kube-alert-action/Chart.yaml | awk '{print $2}')
+
+          helm push \
+            kube-alert-action-${CHART_VERSION}.tgz \
+            oci://ghcr.io/${{ github.repository_owner }}
