@@ -29,11 +29,11 @@ jobs:
 
       - name: Lint chart
         run: |
-          helm lint ./charts/kube-alert-action
+          helm lint ./helm/kube-alert-action
 
       - name: Package chart
         run: |
-          helm package ./charts/kube-alert-action
+          helm package ./helm/kube-alert-action
 
       - name: Push chart
         run: |
