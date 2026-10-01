@@ -2,6 +2,9 @@ name: Docker Build
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   build-and-push:
@@ -24,3 +27,4 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/kube-alert-action:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/kube-alert-action:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/kube-alert-action:${{ github.ref_name }}
