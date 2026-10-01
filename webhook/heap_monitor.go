@@ -98,6 +98,10 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 
 	if !matchFound {
 		log.Info("no match found for metric", "metric", alertpayLoad.Metric)
+		msg := fmt.Sprintf("*No match found for metric* metric:%s", alertpayLoad.Metric)
+		if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
+			log.Error(err, "Failed to send Chat notification")
+		}
 
 	} else {
 		log.Info("AlertEvent CR to be created", "action", action, "executeFrom", executeFrom)

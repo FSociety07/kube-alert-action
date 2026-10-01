@@ -60,8 +60,6 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 		return reconcile.Result{}, err
 	}
 
-	//TODO write a checkpoint to ensure that the script alertEvent.Spec.Action exists. error and return if not
-
 	switch alertEvent.Spec.ExecuteFrom {
 	case "self":
 		cmd := exec.CommandContext(ctx, alertEvent.Spec.Action, alertEvent.Spec.TargetNamespace, alertEvent.Spec.Pod)
@@ -77,6 +75,10 @@ func (r *AlertEventReconciler) Reconcile(ctx context.Context, req reconcile.Requ
 			if err1 := r.Client.Status().Update(ctx, &alertEvent); err1 != nil {
 				log.Error(err1, "Error updating status message for AlertEvent", "name", req.NamespacedName)
 				return reconcile.Result{}, err1
+			}
+			msg = fmt.Sprintf("*Error executing action for AlertEvent name:%s error:%s*", req.NamespacedName, err)
+			if err := r.Notifier.SendMessage(ctx, msg, GChatThreadKey); err != nil {
+				log.Error(err, "Failed to send Chat notification")
 			}
 			return reconcile.Result{}, nil
 		}
