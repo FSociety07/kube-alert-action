@@ -63,15 +63,23 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid method", 405)
 		return
 	}
-
-	var alertpayLoad AlertPayload
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&alertpayLoad); err != nil {
-		log.Error(err, "failed to decode alert payload")
-		http.Error(w, "Malformed alert: "+err.Error(), 400)
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Error(err, "failed to read request body")
+		http.Error(w, "failed to read body", http.StatusBadRequest)
 		return
 	}
-	log.Info("Alert body received", "body", r.Body)
+	defer r.Body.Close()
+
+	log.Info("alert body received", "body", string(bodyBytes))
+
+	var alertpayLoad AlertPayload
+	if err := json.Unmarshal(bodyBytes, &alertpayLoad); err != nil {
+		log.Error(err, "failed to decode alert payload", "body", string(bodyBytes))
+		http.Error(w, "Malformed alert: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	log.Info("Alert payload received", "payload", alertpayLoad)
 
 	GChatThreadKey := notify.ThreadKey(alertpayLoad.Container, alertpayLoad.Metric)
