@@ -26,7 +26,6 @@ type ActionRule struct {
 	ExecuteFrom string `json:"executeFrom"`
 }
 
-// TODO
 type ActionMapStatus struct {
 }
 
