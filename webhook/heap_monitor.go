@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"go_heap/api/v1alpha1"
 	"go_heap/internal/notify"
+	"io"
 	"net/http"
 	"time"
-	"io"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,102 +72,118 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	log.Info("alert body received", "body", string(bodyBytes))
+	log.Info("alert payload received", "body", string(bodyBytes))
 
-	var alertpayLoad AlertPayload
-	if err := json.Unmarshal(bodyBytes, &alertpayLoad); err != nil {
+	var alertpayLoads []AlertPayload
+	if err := json.Unmarshal(bodyBytes, &alertpayLoads); err != nil {
 		log.Error(err, "failed to decode alert payload", "body", string(bodyBytes))
-		http.Error(w, "Malformed alert: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "Malformed alert: "+err.Error(), http.StatusBadRequest) //grafana test notification might fail here due to test payload. send with custom message '[]'
 		return
 	}
 
-	log.Info("Alert payload received", "payload", alertpayLoad)
+	log.Info("JSON parsed alert payload", "payload", alertpayLoads)
 
-	GChatThreadKey := notify.ThreadKey(alertpayLoad.Container, alertpayLoad.Metric)
+	for _, alertpayLoad := range alertpayLoads {
 
-	log.Info("received alert", "targetNamespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
-	msg := fmt.Sprintf("*Alert received*: %s/%s metric=%s", alertpayLoad.TargetNamespace, alertpayLoad.Pod, alertpayLoad.Metric)
-	if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
-		log.Error(err, "Failed to send Chat notification")
-	}
+		GChatThreadKey := notify.ThreadKey(alertpayLoad.Container, alertpayLoad.Metric)
 
-	if alertpayLoad.Container == "" || alertpayLoad.TargetNamespace == "" || alertpayLoad.Pod == "" || alertpayLoad.Metric == "" {
-		log.Error(nil, "Alert Payload is incomplete", "targetNamespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
-		w.WriteHeader(http.StatusOK)
-		//http.Error(w, "Alert Payload is incomplete: "+fmt.Sprintf("%+v\n", alertpayLoad), 400) //grafana alert channel test does not succeed due to http 400
-		return
-	}
-
-	matchFound, action, executeFrom, err := s.matchRule(r.Context(), alertpayLoad.Metric, alertpayLoad.TargetNamespace)
-	if err != nil {
-		log.Error(err, "Unable to reach the cluster")
-		http.Error(w, "Unable to reach the cluster: "+err.Error(), 500)
-		return
-	}
-
-	if !matchFound {
-		log.Info("no match found for metric", "metric", alertpayLoad.Metric)
-		msg := fmt.Sprintf("*No match found for metric* metric:%s", alertpayLoad.Metric)
+		log.Info("received alert", "targetNamespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
+		msg := fmt.Sprintf("*Alert received*: %s/%s metric=%s", alertpayLoad.TargetNamespace, alertpayLoad.Pod, alertpayLoad.Metric)
 		if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
 			log.Error(err, "Failed to send Chat notification")
 		}
 
-	} else {
-		log.Info("AlertEvent CR to be created", "action", action, "executeFrom", executeFrom)
-		msg := fmt.Sprintf("*Match found for alert metric* metric:%s action:%s executeFrom:%s", alertpayLoad.Metric, action, executeFrom)
-		if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
-			log.Error(err, "Failed to send Chat notification")
-		}
-		var alertEvent v1alpha1.AlertEvent
-		if err := s.Client.Get(r.Context(), client.ObjectKey{Namespace: alertpayLoad.TargetNamespace, Name: alertpayLoad.Container + "-" + alertpayLoad.Metric}, &alertEvent); err == nil {
-			log.Info("AlertEvent CR already exists", "namespace", alertpayLoad.TargetNamespace, "name", alertpayLoad.Container+"-"+alertpayLoad.Metric)
-			msg := fmt.Sprintf("*AlertEvent CR already exists* namespace:%s name:%s", alertpayLoad.TargetNamespace, alertpayLoad.Container+"-"+alertpayLoad.Metric)
+		if alertpayLoad.Container == "" || alertpayLoad.TargetNamespace == "" || alertpayLoad.Pod == "" || alertpayLoad.Metric == "" {
+			log.Error(nil, "Alert Payload is incomplete", "targetNamespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
+			msg := fmt.Sprintf("*Alert Payload is incomplete*: targetNamespace=%s,container=%s,pod=%s,metric=%s", alertpayLoad.TargetNamespace, alertpayLoad.Container, alertpayLoad.Pod, alertpayLoad.Metric)
 			if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
 				log.Error(err, "Failed to send Chat notification")
 			}
-		} else if apierrors.IsNotFound(err) {
-			log.Info("Creating AlertEvent CR", "namespace", alertpayLoad.TargetNamespace, "name", alertpayLoad.Container+"-"+alertpayLoad.Metric)
-			CreateAlertEvent := &v1alpha1.AlertEvent{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      alertpayLoad.Container + "-" + alertpayLoad.Metric,
-					Namespace: alertpayLoad.TargetNamespace,
-				},
-				Spec: v1alpha1.AlertEventSpec{
-					TargetNamespace: alertpayLoad.TargetNamespace,
-					Container:       alertpayLoad.Container,
-					Pod:             alertpayLoad.Pod,
-					Metric:          alertpayLoad.Metric,
-					Action:          action,
-					ExecuteFrom:     executeFrom,
-				},
-				Status: v1alpha1.AlertEventStatus{ //does not work consistently. status is set below after CR creation
-					Phase: v1alpha1.PhasePending,
-				},
+			continue
+		}
+
+		matchFound, action, executeFrom, err := s.matchRule(r.Context(), alertpayLoad.Metric, alertpayLoad.TargetNamespace)
+		if err != nil {
+			log.Error(err, "Unable to reach the cluster")
+			msg := fmt.Sprintf("*Unable to reach the cluster. Error: %s*", err)
+			if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
+				log.Error(err, "Failed to send Chat notification")
 			}
-			if err := s.Client.Create(r.Context(), CreateAlertEvent); err != nil {
-				log.Error(err, "Unable to create AlertEvent CR")
-				http.Error(w, "Unable to create AlertEvent CR: "+err.Error(), 500)
-				return
-			} else {
-				CreateAlertEvent.Status.Phase = v1alpha1.PhasePending
-				if err := s.Client.Status().Update(r.Context(), CreateAlertEvent); err != nil {
-					log.Error(err, "Unable to set initial status for AlertEvent CR")
-					http.Error(w, "Unable to set initial status: "+err.Error(), 500)
-					return
-				}
-				log.Info("AlertEvent CR created", "namespace", alertpayLoad.TargetNamespace, "name", alertpayLoad.Container+"-"+alertpayLoad.Metric)
-				msg := fmt.Sprintf("*AlertEvent CR created* namespace:%s name:%s", alertpayLoad.TargetNamespace, alertpayLoad.Container+"-"+alertpayLoad.Metric)
+			continue
+		}
+
+		if !matchFound {
+			log.Info("no match found for metric", "metric", alertpayLoad.Metric)
+			msg := fmt.Sprintf("*No match found for metric* metric:%s", alertpayLoad.Metric)
+			if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
+				log.Error(err, "Failed to send Chat notification")
+			}
+
+		} else {
+			log.Info("AlertEvent CR to be created", "action", action, "executeFrom", executeFrom)
+			msg := fmt.Sprintf("*Match found for alert metric* metric:%s action:%s executeFrom:%s", alertpayLoad.Metric, action, executeFrom)
+			if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
+				log.Error(err, "Failed to send Chat notification")
+			}
+			var alertEvent v1alpha1.AlertEvent
+			if err := s.Client.Get(r.Context(), client.ObjectKey{Namespace: alertpayLoad.TargetNamespace, Name: alertpayLoad.Container + "-" + alertpayLoad.Metric}, &alertEvent); err == nil {
+				log.Info("AlertEvent CR already exists", "namespace", alertpayLoad.TargetNamespace, "name", alertpayLoad.Container+"-"+alertpayLoad.Metric)
+				msg := fmt.Sprintf("*AlertEvent CR already exists* namespace:%s name:%s", alertpayLoad.TargetNamespace, alertpayLoad.Container+"-"+alertpayLoad.Metric)
 				if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
 					log.Error(err, "Failed to send Chat notification")
 				}
+			} else if apierrors.IsNotFound(err) {
+				log.Info("Creating AlertEvent CR", "namespace", alertpayLoad.TargetNamespace, "name", alertpayLoad.Container+"-"+alertpayLoad.Metric)
+				CreateAlertEvent := &v1alpha1.AlertEvent{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      alertpayLoad.Container + "-" + alertpayLoad.Metric,
+						Namespace: alertpayLoad.TargetNamespace,
+					},
+					Spec: v1alpha1.AlertEventSpec{
+						TargetNamespace: alertpayLoad.TargetNamespace,
+						Container:       alertpayLoad.Container,
+						Pod:             alertpayLoad.Pod,
+						Metric:          alertpayLoad.Metric,
+						Action:          action,
+						ExecuteFrom:     executeFrom,
+					},
+					//Status: v1alpha1.AlertEventStatus{ //does not work consistently. status is set below after CR creation
+					//	Phase: v1alpha1.PhasePending,
+					//},
+				}
+				if err := s.Client.Create(r.Context(), CreateAlertEvent); err != nil {
+					log.Error(err, "Unable to create AlertEvent CR")
+					msg := fmt.Sprintf("*Unable to create AlertEvent CR*. Error:%s", err)
+					if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
+						log.Error(err, "Failed to send Chat notification")
+					}
+					continue
+				} else {
+					CreateAlertEvent.Status.Phase = v1alpha1.PhasePending
+					if err := s.Client.Status().Update(r.Context(), CreateAlertEvent); err != nil {
+						log.Error(err, "Unable to set initial status for AlertEvent CR")
+						msg := fmt.Sprintf("*Unable to set initial status for AlertEvent CR*. Error:%s", err)
+						if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
+							log.Error(err, "Failed to send Chat notification")
+						}
+						continue
+					}
+					log.Info("AlertEvent CR created", "namespace", alertpayLoad.TargetNamespace, "name", alertpayLoad.Container+"-"+alertpayLoad.Metric)
+					msg := fmt.Sprintf("*AlertEvent CR created* namespace:%s name:%s", alertpayLoad.TargetNamespace, alertpayLoad.Container+"-"+alertpayLoad.Metric)
+					if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
+						log.Error(err, "Failed to send Chat notification")
+					}
+				}
+			} else {
+				log.Error(err, "Unable to query the cluster on listing AlertEvents")
+				msg := fmt.Sprintf("*Unable to query the cluster on listing AlertEvents*. Error:%s", err)
+				if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
+					log.Error(err, "Failed to send Chat notification")
+				}
+				continue
 			}
-		} else {
-			log.Error(err, "Unable to query the cluster on listing AlertEvents")
-			http.Error(w, "Unable to query the cluster on listing AlertEvents: "+err.Error(), 500)
-			return
 		}
 	}
-
 	w.WriteHeader(202)
 }
 
