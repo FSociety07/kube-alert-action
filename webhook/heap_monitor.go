@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"go_heap/api/v1alpha1"
 	"go_heap/internal/notify"
+	"io"
 	"net/http"
 	"time"
-	"io"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,16 +72,16 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	log.Info("alert body received", "body", string(bodyBytes))
-
+	log.Info("alert payload received", "body", string(bodyBytes))
 	var alertpayLoad AlertPayload
-	if err := json.Unmarshal(bodyBytes, &alertpayLoad); err != nil {
+	var alertpayLoads []AlertPayload
+	if err := json.Unmarshal(bodyBytes, &alertpayLoads); err != nil {
 		log.Error(err, "failed to decode alert payload", "body", string(bodyBytes))
 		http.Error(w, "Malformed alert: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	log.Info("Alert payload received", "payload", alertpayLoad)
+	log.Info("JSON parsed alert payload", "payload", alertpayLoads)
 
 	GChatThreadKey := notify.ThreadKey(alertpayLoad.Container, alertpayLoad.Metric)
 
