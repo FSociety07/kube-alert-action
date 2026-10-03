@@ -77,7 +77,7 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 	var alertpayLoads []AlertPayload
 	if err := json.Unmarshal(bodyBytes, &alertpayLoads); err != nil {
 		log.Error(err, "failed to decode alert payload", "body", string(bodyBytes))
-		http.Error(w, "Malformed alert: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "Malformed alert: "+err.Error(), http.StatusBadRequest) //grafana test notification might fail here due to test payload. send with custom message '[]'
 		return
 	}
 
@@ -95,14 +95,20 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 
 		if alertpayLoad.Container == "" || alertpayLoad.TargetNamespace == "" || alertpayLoad.Pod == "" || alertpayLoad.Metric == "" {
 			log.Error(nil, "Alert Payload is incomplete", "targetNamespace", alertpayLoad.TargetNamespace, "container", alertpayLoad.Container, "pod", alertpayLoad.Pod, "metric", alertpayLoad.Metric)
-			//w.WriteHeader(http.StatusOK) //setting HTTP status per alertPayLoad needs to be removed
-			//http.Error(w, "Alert Payload is incomplete: "+fmt.Sprintf("%+v\n", alertpayLoad), 400) //grafana alert channel test does not succeed due to http 400
+			msg := fmt.Sprintf("*Alert Payload is incomplete*: targetNamespace=%s,container=%s,pod=%s,metric=%s", alertpayLoad.TargetNamespace, alertpayLoad.Container, alertpayLoad.Pod, alertpayLoad.Metric)
+			if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
+				log.Error(err, "Failed to send Chat notification")
+			}
 			continue
 		}
 
 		matchFound, action, executeFrom, err := s.matchRule(r.Context(), alertpayLoad.Metric, alertpayLoad.TargetNamespace)
 		if err != nil {
 			log.Error(err, "Unable to reach the cluster")
+			msg := fmt.Sprintf("*Unable to reach the cluster. Error: %s*", err)
+			if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
+				log.Error(err, "Failed to send Chat notification")
+			}
 			continue
 		}
 
@@ -141,17 +147,25 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 						Action:          action,
 						ExecuteFrom:     executeFrom,
 					},
-					Status: v1alpha1.AlertEventStatus{ //does not work consistently. status is set below after CR creation
-						Phase: v1alpha1.PhasePending,
-					},
+					//Status: v1alpha1.AlertEventStatus{ //does not work consistently. status is set below after CR creation
+					//	Phase: v1alpha1.PhasePending,
+					//},
 				}
 				if err := s.Client.Create(r.Context(), CreateAlertEvent); err != nil {
 					log.Error(err, "Unable to create AlertEvent CR")
+					msg := fmt.Sprintf("*Unable to create AlertEvent CR*. Error:%s", err)
+					if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
+						log.Error(err, "Failed to send Chat notification")
+					}
 					continue
 				} else {
 					CreateAlertEvent.Status.Phase = v1alpha1.PhasePending
 					if err := s.Client.Status().Update(r.Context(), CreateAlertEvent); err != nil {
 						log.Error(err, "Unable to set initial status for AlertEvent CR")
+						msg := fmt.Sprintf("*Unable to set initial status for AlertEvent CR*. Error:%s", err)
+						if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
+							log.Error(err, "Failed to send Chat notification")
+						}
 						continue
 					}
 					log.Info("AlertEvent CR created", "namespace", alertpayLoad.TargetNamespace, "name", alertpayLoad.Container+"-"+alertpayLoad.Metric)
@@ -162,6 +176,10 @@ func (s *Server) handleAlert(w http.ResponseWriter, r *http.Request) {
 				}
 			} else {
 				log.Error(err, "Unable to query the cluster on listing AlertEvents")
+				msg := fmt.Sprintf("*Unable to query the cluster on listing AlertEvents*. Error:%s", err)
+				if err := s.Notifier.SendMessage(r.Context(), msg, GChatThreadKey); err != nil {
+					log.Error(err, "Failed to send Chat notification")
+				}
 				continue
 			}
 		}
