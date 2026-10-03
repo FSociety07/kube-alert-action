@@ -24,6 +24,14 @@ https://github.com/fsociety07/kube-alert-action/pkgs/container/kube-alert-action
 helm install kube-alert-action oci://ghcr.io/fsociety07/kube-alert-action -n <namepsace> --create-namespace
 
 
+#Alert payload format
+```
+[
+	{"targetNamespace":"prod","container":"payment-api","pod":"payment-api-f35ds-242f","metric":"heap-memory-usage-bytes"}, 
+	{...}
+]
+```
+
 # Actionmap CR Manifest
 
 ```yaml
@@ -34,13 +42,13 @@ metadata:
   namespace: prod
 spec:
   rules:
-    - metric: container-heap-memory-usage-bytes
+    - metric: heap-memory-usage-bytes
       action: /scripts/heapdump.sh
       executeFrom: targetPod
-    - metric: container-cpu-usage-seconds
+    - metric: cpu-usage-seconds
       action: /scripts/threaddump.sh
       executeFrom: targetPod
-    - metric: splunk-jcs-corruption
-      action: /scripts/rollout-deploy.sh
+    - metric: corrupted-jcs
+      action: /scripts/graceful-restart.sh
       executeFrom: self
 ```
