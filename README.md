@@ -1,10 +1,9 @@
-TODO
+# TODO
 
-helm packaging
-
+querier component
 leader election
 
-INSTALL
+# INSTALL
 
 docker pull sawn37/kube-alert-action:latest
 
@@ -19,3 +18,22 @@ https://github.com/fsociety07/kube-alert-action/pkgs/container/kube-alert-action
 helm install kube-alert-action \
   oci://ghcr.io/fsociety07/kube-alert-action \
   --version 0.1.0
+
+```yaml
+apiVersion: sawnt.xyz/v1alpha1
+kind: ActionMap
+metadata:
+  name: prod-container-actions
+  namespace: prod
+spec:
+  rules:
+    - metric: container-heap-memory-usage-bytes
+      action: /scripts/heapdump.sh
+      executeFrom: targetPod
+    - metric: container-cpu-usage-seconds
+      action: /scripts/threaddump.sh
+      executeFrom: targetPod
+    - metric: splunk-jcs-corruption
+      action: /scripts/rollout-deploy.sh
+      executeFrom: self
+```
