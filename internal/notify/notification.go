@@ -17,15 +17,21 @@ type ChatMessage struct {
 	Text string `json:"text"`
 }
 
+type chatItem struct {
+	msg       string
+	threadKey string
+}
+
 type Notifier struct {
 	WebhookURL string
+	queue      chan chatItem
 }
 
 func ThreadKey(container, metric string) string {
 	return container + "-" + metric + "-" + time.Now().Format("2006-01-02")
 }
 
-func (n *Notifier) SendMessage(ctx context.Context, msg string, threadKey string) error {
+func (n *Notifier) send(ctx context.Context, msg string, threadKey string) error {
 	log := logf.FromContext(ctx)
 
 	//build msg format and URL
@@ -70,6 +76,19 @@ func (n *Notifier) SendMessage(ctx context.Context, msg string, threadKey string
 	if resp.StatusCode != http.StatusOK {
 		log.Error(nil, "Chat webhook returned non-OK status", "status", resp.StatusCode, "response", respBody)
 		return fmt.Errorf("chat webhook returned status %d with response %s", resp.StatusCode, respBody)
+	}
+
+	return nil
+}
+
+func (n *Notifier) Start(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case item := <-n.queue:
+			n.send(ctx, item.msg, item.threadKey)
+		}
 	}
 
 	return nil
