@@ -1,10 +1,9 @@
 # TODO
 
-querier component
-
-leader election
-
-rate-limit google chat calls
+* querier component
+* leader election
+* rate-limit google chat calls
+* parallel action execution
 
 # INSTALL
 
