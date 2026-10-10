@@ -29,7 +29,11 @@ func main() {
 		log.Fatalf("Unable to start manager: %v", err)
 	}
 
-	notifier := notify.Notifier{WebhookURL: os.Getenv("GOOGLE_CHAT_WEBHOOK_URL")}
+	notifier := notify.NewNotifier(os.Getenv("GOOGLE_CHAT_WEBHOOK_URL"))
+
+	if err := mgr.Add(notifier); err != nil {
+		log.Fatalf("Unable to add notifier to the manager: %v", err)
+	}
 
 	if err := mgr.Add(&webhook.Server{
 		Client:   mgr.GetClient(),
