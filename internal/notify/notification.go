@@ -34,6 +34,9 @@ func ThreadKey(container, metric string) string {
 func (n *Notifier) send(ctx context.Context, msg string, threadKey string) error {
 	log := logf.FromContext(ctx)
 
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	//build msg format and URL
 	payload := ChatMessage{Text: msg}
 
@@ -74,7 +77,7 @@ func (n *Notifier) send(ctx context.Context, msg string, threadKey string) error
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		log.Error(nil, "Chat webhook returned non-OK status", "status", resp.StatusCode, "response", respBody)
+		log.Error(nil, "Chat webhook returned non-OK status", "status", resp.StatusCode, "response", string(respBody))
 		return fmt.Errorf("chat webhook returned status %d with response %s", resp.StatusCode, respBody)
 	}
 
@@ -82,14 +85,33 @@ func (n *Notifier) send(ctx context.Context, msg string, threadKey string) error
 }
 
 func (n *Notifier) Start(ctx context.Context) error {
+	log := logf.FromContext(ctx)
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case item := <-n.queue:
-			n.send(ctx, item.msg, item.threadKey)
+			if err := n.send(ctx, item.msg, item.threadKey); err != nil {
+				log.Error(err, "failed to send chat message.", "threadKey", item.threadKey)
+			}
+			time.Sleep(time.Second)
 		}
 	}
+}
 
-	return nil
+func (n *Notifier) SendMessage(ctx context.Context, msg string, threadKey string) error {
+	item := chatItem{msg: msg, threadKey: threadKey}
+
+	select {
+	case n.queue <- item:
+		return nil
+
+	default:
+		return fmt.Errorf("chat queue full, message dropped")
+	}
+
+}
+
+func NewNotifier(webhookURL string) *Notifier {
+	return &Notifier{WebhookURL: webhookURL, queue: make(chan chatItem, 100)}
 }
